@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import math
 import random
+import time
 
 import gym
 import gym_maze
@@ -16,8 +17,11 @@ def simulate():
 
     num_streaks = 0
 
-    # Render tha maze
-    env.render()
+    # Render the maze
+    env.render(mode="grid")
+
+    # Add preliminary feedback
+    add_constraints(3)
 
     for episode in range(NUM_EPISODES):
 
@@ -29,6 +33,8 @@ def simulate():
         total_reward = 0
 
         for t in range(MAX_T):
+
+            time.sleep(FRAME_TIME)
 
             # Select an action
             action = select_action(state_0, explore_rate)
@@ -70,7 +76,7 @@ def simulate():
                     print("Total reward: %f" % total_reward)
                     print("")
 
-            # Render tha maze
+            # Render the maze
             if RENDER_MAZE:
                 env.render()
 
@@ -80,6 +86,7 @@ def simulate():
             if done:
                 print("Episode %d finished after %f time steps with total reward = %f (streak %d)."
                       % (episode, t, total_reward, num_streaks))
+                times.append(t)
 
                 if t <= SOLVED_T:
                     num_streaks += 1
@@ -98,6 +105,12 @@ def simulate():
         # Update parameters
         explore_rate = get_explore_rate(episode)
         learning_rate = get_learning_rate(episode)
+
+        if episode != 0 and episode % 10 == 0:
+            env.render(mode="grid")
+            user_input = raw_input("Would you like to add a constraint? (y/N)")
+            if user_input.lower() == 'y':
+                add_constraints(1)
 
 
 def select_action(state, explore_rate):
@@ -135,14 +148,39 @@ def state_to_bucket(state):
     return tuple(bucket_indice)
 
 
+def add_constraints(num_constraints):
+    print("You may enter up to {} constraints...\n".format(num_constraints))
+    for i in range(0, num_constraints):
+
+        user_input = raw_input("Enter a cell (x,y) to place a constraint (c to cancel): ")
+        if user_input.lower() == 'c':
+            break
+        cell = tuple(int(x.strip()) for x in user_input.split(','))
+
+
+        user_input = raw_input("Enter the cost value for that cell (c to cancel): ")
+        if user_input.lower() == 'c':
+            break
+        cost = float(user_input)
+
+        env.maze_view.maze.add_constraint(cost, cell)
+        # env.maze_view.maze.remove_constraint((1,1))
+
+
 if __name__ == "__main__":
 
     # Initialize the "maze" environment
-    env = gym.make("maze-random-10x10-plus-v0")
+    # env = gym.make("maze-random-5x5-v0")
+    # env = gym.make("maze-sample-3x3-v0")
+    # env = gym.make("maze-sample-5x5-v0")
+    env = gym.make("maze-sample-10x10-v0")
+    # env = gym.make("maze-random-20x20-v0")
+    # env = gym.make("maze-random-20x20-plus-v0")
 
     '''
     Defining the environment related constants
     '''
+
     # Number of discrete states (bucket) per state dimension
     MAZE_SIZE = tuple((env.observation_space.high + np.ones(env.observation_space.shape)).astype(int))
     NUM_BUCKETS = MAZE_SIZE  # one bucket per grid
@@ -164,11 +202,13 @@ if __name__ == "__main__":
     '''
     NUM_EPISODES = 50000
     MAX_T = np.prod(MAZE_SIZE, dtype=int) * 100
-    STREAK_TO_END = 100
+    STREAK_TO_END = 20
     SOLVED_T = np.prod(MAZE_SIZE, dtype=int)
     DEBUG_MODE = 0
     RENDER_MAZE = True
-    ENABLE_RECORDING = True
+    ENABLE_RECORDING = False
+    FRAME_TIME = 0.0
+
 
     '''
     Creating a Q-Table for each state-action pair
@@ -183,7 +223,11 @@ if __name__ == "__main__":
     if ENABLE_RECORDING:
         env.monitor.start(recording_folder, force=True)
 
+    times = []
     simulate()
+    # print(times)
+    print("Total time: {}".format(np.sum(times)))
+    print("Average time: {}".format(np.mean(times)))
 
     if ENABLE_RECORDING:
         env.monitor.close()
